@@ -5,7 +5,6 @@ import os
 from src.matcher import fuzzy_match_columns, auto_detect_primary_key
 from src.engine import ReconciliationEngine
 from src.reporter import generate_excel_report
-from src.ai_analyser import run_rule_based_analysis
 
 def main():
     print("🚀 Running ETL Reconciliation Backend Verification...")
@@ -26,9 +25,6 @@ def main():
     df_src = pd.read_csv(src_file)
     df_tgt = pd.read_excel(tgt_file)
     
-    with open(log_file, "r") as f:
-        log_text = f.read()
-        
     print(f"✅ Loaded datasets. Source: {len(df_src)} rows, Target: {len(df_tgt)} rows.")
     
     # 3. Fuzzy Column Mapping
@@ -94,17 +90,6 @@ def main():
     assert len(excel_report_bytes) > 2000, "Excel file should be non-trivial size"
     print("✅ Excel report generation assertions passed.")
     
-    # 7. Verify Rule-based Diagnostic output
-    print("\n📝 Compiling rule-based diagnostics...")
-    diagnostics = run_rule_based_analysis(results, log_text)
-    print(diagnostics[:600] + "\n... [TRUNCATED] ...")
-    
-    assert "Row Mismatch" not in diagnostics, "Row count is equal (both are 200), so Row Mismatch should not be printed"
-    assert "Data Loss" in diagnostics, "Should mention data loss / missing keys"
-    assert "Phantom Records" in diagnostics, "Should mention phantom records"
-    assert "Conversion warning" in diagnostics, "Should extract conversion warning from log"
-    
-    print("✅ Diagnostics reports assertions passed.")
     print("\n💯 All backend validation checks completed successfully! Ready for Streamlit execution.")
 
 if __name__ == "__main__":

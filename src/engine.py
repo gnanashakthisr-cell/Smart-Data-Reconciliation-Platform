@@ -12,7 +12,8 @@ class ReconciliationEngine:
         column_mappings: Dict[str, str],  # source_col -> target_col
         float_tolerance: float = 1e-4,
         ignore_casing: bool = False,
-        trim_whitespace: bool = True
+        trim_whitespace: bool = True,
+        max_mismatch_details: int = 10000
     ):
         # Create copies to prevent modifying user's dataframes
         self.df_source = df_source.copy()
@@ -27,6 +28,7 @@ class ReconciliationEngine:
         self.float_tolerance = float_tolerance
         self.ignore_casing = ignore_casing
         self.trim_whitespace = trim_whitespace
+        self.max_mismatch_details = max_mismatch_details
         
         # Results container
         self.results = {}
@@ -231,49 +233,73 @@ class ReconciliationEngine:
         df_tgt: pd.DataFrame
     ) -> Tuple[pd.DataFrame, int, int]:
         """
-        Compares cells row-by-row, column-by-column for common rows.
+        Compares cells for common rows using vectorized operations.
         """
         mismatches = []
         compared_count = len(df_src)
-        match_count = 0
         
         if compared_count == 0:
             return pd.DataFrame(), 0, 0
-            
-        for idx in range(compared_count):
-            row_src = df_src.iloc[idx]
-            row_tgt = df_tgt.iloc[idx]
-            
-            key_val = row_src[self.source_key]
-            row_has_mismatch = False
-            
-            for src_col, tgt_col in self.column_mappings.items():
-                # Skip the primary key if it's in the mapping (already verified equal by design)
-                if src_col == self.source_key:
-                    continue
-                    
-                val_src = row_src.get(src_col)
-                val_tgt = row_tgt.get(tgt_col)
-                
-                # Check mismatch
-                is_mismatched = self._is_value_mismatched(val_src, val_tgt)
-                
-                if is_mismatched:
-                    row_has_mismatch = True
-                    mismatches.append({
-                        self.source_key: key_val,
-                        "source_column": src_col,
-                        "target_column": tgt_col,
-                        "source_value": val_src,
-                        "target_value": val_tgt,
-                        "source_value_str": str(val_src),
-                        "target_value_str": str(val_tgt),
-                        "reason": self._get_mismatch_reason(val_src, val_tgt)
-                    })
-                    
-            if not row_has_mismatch:
-                match_count += 1
-                
+
+        row_has_mismatch = pd.Series(False, index=df_src.index)
+        keys = df_src[self.source_key].reset_index(drop=True)
+
+        for src_col, tgt_col in self.column_mappings.items():
+            if src_col == self.source_key or src_col not in df_src.columns or tgt_col not in df_tgt.columns:
+                continue
+
+            src = df_src[src_col].reset_index(drop=True)
+            tgt = df_tgt[tgt_col].reset_index(drop=True)
+
+            src_str = src.astype("string")
+            tgt_str = tgt.astype("string")
+            src_norm = src_str.str.strip().str.lower()
+            tgt_norm = tgt_str.str.strip().str.lower()
+            null_tokens = ["", "nan", "none", "null", "<na>"]
+            src_null = src.isna() | src_norm.isin(null_tokens)
+            tgt_null = tgt.isna() | tgt_norm.isin(null_tokens)
+
+            mismatch = src_null.ne(tgt_null)
+            both_present = ~(src_null | tgt_null)
+
+            src_num = pd.to_numeric(src, errors="coerce")
+            tgt_num = pd.to_numeric(tgt, errors="coerce")
+            numeric_mask = both_present & src_num.notna() & tgt_num.notna()
+            mismatch |= numeric_mask & ((src_num - tgt_num).abs() > self.float_tolerance)
+
+            text_mask = both_present & ~numeric_mask
+            left_text = src_str
+            right_text = tgt_str
+            if self.trim_whitespace:
+                left_text = left_text.str.strip()
+                right_text = right_text.str.strip()
+            if self.ignore_casing:
+                left_text = left_text.str.lower()
+                right_text = right_text.str.lower()
+            mismatch |= text_mask & left_text.ne(right_text)
+
+            mismatch_indices = mismatch[mismatch].index
+            row_has_mismatch.loc[mismatch_indices] = True
+
+            remaining_slots = self.max_mismatch_details - len(mismatches)
+            if remaining_slots <= 0:
+                continue
+
+            for idx in mismatch_indices[:remaining_slots]:
+                val_src = src.iloc[idx]
+                val_tgt = tgt.iloc[idx]
+                mismatches.append({
+                    self.source_key: keys.iloc[idx],
+                    "source_column": src_col,
+                    "target_column": tgt_col,
+                    "source_value": val_src,
+                    "target_value": val_tgt,
+                    "source_value_str": str(val_src),
+                    "target_value_str": str(val_tgt),
+                    "reason": self._get_mismatch_reason(val_src, val_tgt)
+                })
+
+        match_count = compared_count - int(row_has_mismatch.sum())
         value_mismatches_df = pd.DataFrame(mismatches)
         
         return value_mismatches_df, match_count, compared_count

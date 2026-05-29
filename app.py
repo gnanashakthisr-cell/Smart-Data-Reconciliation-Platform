@@ -31,6 +31,13 @@ def load_css(css_path):
 css_file = os.path.join(os.path.dirname(__file__), "assets", "custom.css")
 load_css(css_file)
 
+@st.cache_data(show_spinner=False)
+def load_dataset(file_bytes: bytes, file_name: str) -> pd.DataFrame:
+    buffer = io.BytesIO(file_bytes)
+    if file_name.lower().endswith(".csv"):
+        return pd.read_csv(buffer)
+    return pd.read_excel(buffer)
+
 # Helper function to generate mock ETL datasets
 def generate_demo_datasets() -> tuple[pd.DataFrame, pd.DataFrame, str]:
     np.random.seed(42)
@@ -131,17 +138,11 @@ with st.sidebar:
 
     if src_file:
         st.session_state.src_filename = src_file.name
-        if src_file.name.endswith('.csv'):
-            st.session_state.df_source = pd.read_csv(src_file)
-        else:
-            st.session_state.df_source = pd.read_excel(src_file)
+        st.session_state.df_source = load_dataset(src_file.getvalue(), src_file.name)
             
     if tgt_file:
         st.session_state.tgt_filename = tgt_file.name
-        if tgt_file.name.endswith('.csv'):
-            st.session_state.df_target = pd.read_csv(tgt_file)
-        else:
-            st.session_state.df_target = pd.read_excel(tgt_file)
+        st.session_state.df_target = load_dataset(tgt_file.getvalue(), tgt_file.name)
             
     if log_file:
         st.session_state.etl_log = io.StringIO(log_file.getvalue().decode("utf-8")).read()
@@ -233,7 +234,8 @@ with st.spinner("Executing reconciliation audits..."):
         column_mappings=col_mapping_selections,
         float_tolerance=float_tol,
         ignore_casing=ignore_case,
-        trim_whitespace=trim_space
+        trim_whitespace=trim_space,
+        max_mismatch_details=10000
     )
     
     results = engine.execute()
@@ -261,8 +263,8 @@ d_tgt = find_col(df_tgt, ['date', 'time'])
 p_tgt = find_col(df_tgt, ['project name', 'project_name', 'projectname', 'project id', 'project_id', 'projectid', 'project', 'proj'])
 m_tgt = find_col(df_tgt, ['min', 'time', 'amount'])
 
-source_mins_total = int(df_src[m_src].sum()) if m_src else 0
-target_mins_total = int(df_tgt[m_tgt].sum()) if m_tgt else 0
+source_mins_total = int(pd.to_numeric(df_src[m_src], errors="coerce").fillna(0).sum()) if m_src else 0
+target_mins_total = int(pd.to_numeric(df_tgt[m_tgt], errors="coerce").fillna(0).sum()) if m_tgt else 0
 
 kpi_html = f"""
 <div class="reconcile-card-container">
@@ -335,9 +337,14 @@ with tab_overview:
         st.markdown("### ⏱️ Minutes Comparison (Source vs Target)")
         
         def render_comparison(df_src_grp, df_tgt_grp, group_cols, title):
+            for col in group_cols:
+                df_src_grp[col] = df_src_grp[col].astype("string").fillna("Unknown")
+                df_tgt_grp[col] = df_tgt_grp[col].astype("string").fillna("Unknown")
+
             # Merge source and target
             merged = pd.merge(df_src_grp, df_tgt_grp, on=group_cols, how='outer').fillna(0)
             merged['Unmatched'] = merged['Target Mins'] - merged['Source Mins']
+            merged = merged.sort_values(by="Unmatched", key=lambda s: s.abs(), ascending=False).head(50)
             
             # Format and Style Table
             # Create total row
@@ -381,44 +388,54 @@ with tab_overview:
             st.plotly_chart(fig, use_container_width=True, key=f"chart_{title.replace(' ', '_')}")
             st.dataframe(styled_df, use_container_width=True)
             st.markdown("<hr style='border-color: #1e293b; margin: 20px 0;'>", unsafe_allow_html=True)
+
+        def aggregate_minutes(df, group_cols, minutes_col, output_cols):
+            working = df[group_cols + [minutes_col]].copy()
+            for col in group_cols:
+                working[col] = working[col].astype("string").fillna("Unknown")
+            working[minutes_col] = pd.to_numeric(working[minutes_col], errors="coerce").fillna(0)
+            grouped = working.groupby(group_cols, dropna=False, observed=True)[minutes_col].sum().reset_index()
+            return grouped.rename(columns=dict(zip(group_cols + [minutes_col], output_cols)))
         
         if u_src and m_src and u_tgt and m_tgt:
             # 1. By User
-            df_u_src = df_src.groupby(u_src)[m_src].sum().reset_index().rename(columns={u_src: 'User', m_src: 'Source Mins'})
-            df_u_tgt = df_tgt.groupby(u_tgt)[m_tgt].sum().reset_index().rename(columns={u_tgt: 'User', m_tgt: 'Target Mins'})
+            df_u_src = aggregate_minutes(df_src, [u_src], m_src, ['User', 'Source Mins'])
+            df_u_tgt = aggregate_minutes(df_tgt, [u_tgt], m_tgt, ['User', 'Target Mins'])
             render_comparison(df_u_src, df_u_tgt, ['User'], "Aggregated by User")
             
             # 2. By Project
             if p_src and p_tgt:
-                df_p_src = df_src.groupby(p_src)[m_src].sum().reset_index().rename(columns={p_src: 'Project', m_src: 'Source Mins'})
-                df_p_tgt = df_tgt.groupby(p_tgt)[m_tgt].sum().reset_index().rename(columns={p_tgt: 'Project', m_tgt: 'Target Mins'})
+                df_p_src = aggregate_minutes(df_src, [p_src], m_src, ['Project', 'Source Mins'])
+                df_p_tgt = aggregate_minutes(df_tgt, [p_tgt], m_tgt, ['Project', 'Target Mins'])
                 render_comparison(df_p_src, df_p_tgt, ['Project'], "Aggregated by Project")
                 
                 # 3. By User & Project
-                df_up_src = df_src.groupby([u_src, p_src])[m_src].sum().reset_index().rename(columns={u_src: 'User', p_src: 'Project', m_src: 'Source Mins'})
-                df_up_tgt = df_tgt.groupby([u_tgt, p_tgt])[m_tgt].sum().reset_index().rename(columns={u_tgt: 'User', p_tgt: 'Project', m_tgt: 'Target Mins'})
+                df_up_src = aggregate_minutes(df_src, [u_src, p_src], m_src, ['User', 'Project', 'Source Mins'])
+                df_up_tgt = aggregate_minutes(df_tgt, [u_tgt, p_tgt], m_tgt, ['User', 'Project', 'Target Mins'])
                 render_comparison(df_up_src, df_up_tgt, ['User', 'Project'], "Aggregated by User & Project")
                 
         else:
             st.info("Required columns (User and Minutes) could not be identified to generate comparison tables.")
     with col_c2:
         st.markdown("### 📂 Export Reconciliation Report")
-        st.write("Generate and download a comprehensive Microsoft Excel exception audit sheet styling all issues into separated sheets with standard formulas.")
-        
-        # Generate Excel binary
-        excel_bytes = generate_excel_report(
-            results=results,
-            source_name=st.session_state.src_filename or "source_transactions.csv",
-            target_name=st.session_state.tgt_filename or "dw_transactions_target.xlsx"
-        )
-        
-        st.download_button(
-            label="📥 Download Excel Exception Report",
-            data=excel_bytes,
-            file_name=f"Reconciliation_Report_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx",
-            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-            use_container_width=True
-        )
+        st.write("Generate a Microsoft Excel exception audit report when you need to download it.")
+
+        if st.button("Prepare Excel Report", use_container_width=True):
+            with st.spinner("Preparing Excel report..."):
+                st.session_state.excel_report_bytes = generate_excel_report(
+                    results=results,
+                    source_name=st.session_state.src_filename or "source_transactions.csv",
+                    target_name=st.session_state.tgt_filename or "dw_transactions_target.xlsx"
+                )
+
+        if "excel_report_bytes" in st.session_state:
+            st.download_button(
+                label="📥 Download Excel Exception Report",
+                data=st.session_state.excel_report_bytes,
+                file_name=f"Reconciliation_Report_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx",
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                use_container_width=True
+            )
         
         st.markdown("<div style='height: 15px;'></div>", unsafe_allow_html=True)
         
