@@ -1,0 +1,241 @@
+/* Custom Premium CSS for Smart Data Reconciliation Platform */
+
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
+
+/* Main application layout and background adjustments */
+html, body, [data-testid="stAppViewContainer"] {
+    font-family: 'Outfit', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    background-color: #0b0f19;
+    color: #e2e8f0;
+}
+
+[data-testid="stHeader"] {
+    background-color: rgba(11, 15, 25, 0.8);
+    backdrop-filter: blur(10px);
+}
+
+[data-testid="stSidebar"] {
+    background-color: #0f172a;
+    border-right: 1px solid #1e293b;
+}
+
+/* Titles and Headers styling */
+h1 {
+    font-family: 'Outfit', sans-serif;
+    font-weight: 700 !important;
+    background: linear-gradient(135deg, #38bdf8 0%, #a855f7 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    letter-spacing: -0.025em;
+    margin-bottom: 0.5rem !important;
+}
+
+h2, h3, h4 {
+    font-family: 'Outfit', sans-serif;
+    font-weight: 600 !important;
+    color: #f1f5f9 !important;
+}
+
+/* Glassmorphism Metric Cards */
+.reconcile-card-container {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 1.25rem;
+    margin-bottom: 1.5rem;
+    width: 100%;
+}
+
+.reconcile-card {
+    background: rgba(30, 41, 59, 0.45);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 16px;
+    padding: 1.25rem;
+    position: relative;
+    overflow: hidden;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: 0 4px 30px rgba(0, 0, 0, 0.2);
+}
+
+.reconcile-card:hover {
+    transform: translateY(-4px);
+    border-color: rgba(56, 189, 248, 0.4);
+    box-shadow: 0 10px 30px rgba(56, 189, 248, 0.15);
+}
+
+/* Card variants based on state */
+.reconcile-card.info {
+    border-left: 4px solid #38bdf8;
+}
+
+.reconcile-card.success {
+    border-left: 4px solid #10b981;
+}
+
+.reconcile-card.warning {
+    border-left: 4px solid #f59e0b;
+}
+
+.reconcile-card.danger {
+    border-left: 4px solid #ef4444;
+}
+
+.reconcile-card::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    right: 0;
+    width: 60px;
+    height: 60px;
+    background: radial-gradient(circle, rgba(255,255,255,0.03) 0%, rgba(255,255,255,0) 70%);
+    border-radius: 50%;
+}
+
+.card-title {
+    font-size: 0.85rem;
+    font-weight: 500;
+    color: #94a3b8;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-bottom: 0.5rem;
+}
+
+.card-value {
+    font-size: 2.2rem;
+    font-weight: 700;
+    color: #ffffff;
+    line-height: 1;
+    margin-bottom: 0.25rem;
+}
+
+.card-subtext {
+    font-size: 0.75rem;
+    color: #64748b;
+}
+
+/* Stylized Status Badge */
+.status-badge {
+    display: inline-block;
+    padding: 0.25rem 0.75rem;
+    border-radius: 9999px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.status-badge.success {
+    background-color: rgba(16, 185, 129, 0.15);
+    color: #34d399;
+    border: 1px solid rgba(16, 185, 129, 0.3);
+}
+
+.status-badge.danger {
+    background-color: rgba(239, 68, 68, 0.15);
+    color: #f87171;
+    border: 1px solid rgba(239, 68, 68, 0.3);
+}
+
+.status-badge.warning {
+    background-color: rgba(245, 158, 11, 0.15);
+    color: #fbbf24;
+    border: 1px solid rgba(245, 158, 11, 0.3);
+}
+
+/* Custom Table View Wrapper */
+.mismatch-table-container {
+    margin-top: 1rem;
+    border-radius: 12px;
+    border: 1px solid #1e293b;
+    overflow: hidden;
+}
+
+/* Highlighting Mismatched Cells */
+.mismatch-cell-highlight {
+    background-color: rgba(239, 68, 68, 0.2) !important;
+    border: 1px solid rgba(239, 68, 68, 0.4) !important;
+    color: #f87171 !important;
+    font-weight: 500;
+    padding: 2px 6px;
+    border-radius: 4px;
+}
+
+.match-cell-highlight {
+    background-color: rgba(16, 185, 129, 0.15) !important;
+    color: #34d399 !important;
+    padding: 2px 6px;
+    border-radius: 4px;
+}
+
+/* Code block & logs stylings */
+.code-log-container {
+    font-family: 'JetBrains Mono', monospace;
+    background-color: #020617;
+    border: 1px solid #1e293b;
+    border-radius: 8px;
+    padding: 1rem;
+    color: #38bdf8;
+    max-height: 250px;
+    overflow-y: auto;
+    font-size: 0.85rem;
+}
+
+/* Sidebar Custom Button Styling */
+.stButton>button {
+    background: linear-gradient(135deg, #0284c7 0%, #7c3aed 100%) !important;
+    color: white !important;
+    border: none !important;
+    border-radius: 8px !important;
+    font-weight: 600 !important;
+    transition: all 0.2s ease-in-out !important;
+    padding: 0.5rem 1rem !important;
+    width: 100%;
+}
+
+.stButton>button:hover {
+    transform: translateY(-2px) !important;
+    box-shadow: 0 4px 12px rgba(124, 58, 237, 0.3) !important;
+}
+
+/* Streamlit specific cleanups */
+[data-testid="stMetricValue"] {
+    font-family: 'Outfit', sans-serif;
+    font-weight: 700;
+}
+
+.stTabs [data-baseweb="tab-list"] {
+    gap: 8px;
+    background-color: rgba(15, 23, 42, 0.6);
+    padding: 6px;
+    border-radius: 12px;
+    border: 1px solid #1e293b;
+}
+
+.stTabs [data-baseweb="tab"] {
+    height: 40px;
+    border-radius: 8px;
+    background-color: transparent;
+    border: none;
+    color: #94a3b8;
+    font-family: 'Outfit', sans-serif;
+    font-weight: 500;
+    transition: all 0.2s ease;
+}
+
+.stTabs [data-baseweb="tab"]:hover {
+    color: #f1f5f9;
+    background-color: rgba(255, 255, 255, 0.05);
+}
+
+.stTabs [aria-selected="true"] {
+    background-color: #1e293b !important;
+    color: #38bdf8 !important;
+    border: 1px solid rgba(56, 189, 248, 0.2) !important;
+}
+
+.stAlert {
+    border-radius: 12px !important;
+    background-color: rgba(30, 41, 59, 0.5) !important;
+    border: 1px solid #1e293b !important;
+}

@@ -1,0 +1,11 @@
+[2026-05-28 19:00:00] INFO: Starting inventory synchronization pipeline 'sync_dwh_inventory'
+[2026-05-28 19:00:01] INFO: Extraction source CSV completed. Count: 200 rows.
+[2026-05-28 19:00:02] INFO: Running column mapper: item_id -> product_id, vendor_code -> vendor_ref, retail_price -> price, qty_on_hand -> stock_qty.
+[2026-05-28 19:00:02] WARNING: Conversion warning: Integer 'qty_on_hand' cast to Double precision float in Snowflake destination column 'stock_qty'.
+[2026-05-28 19:00:03] ERROR: Failed to insert product SKU-1010. Null constraint violation on non-nullable field 'location_id'. Row skipped.
+[2026-05-28 19:00:03] ERROR: Failed to insert product SKU-1045. Null constraint violation on non-nullable field 'location_id'. Row skipped.
+[2026-05-28 19:00:04] ERROR: Failed to insert product SKU-1099. Deadlock detected during warehouse transaction. Row skipped.
+[2026-05-28 19:00:04] ERROR: Failed to insert product SKU-1150. Connection timeout while copying batch. Row skipped.
+[2026-05-28 19:00:05] WARNING: Value mapping warning: Vendor code for record SKU-1030 was cast to lower-case 'v-xx' due to warehouse casing rule.
+[2026-05-28 19:00:06] INFO: Completed write. 198 target records successfully stored (with 2 duplicates re-injected due to retry attempts).
+[2026-05-28 19:00:07] INFO: Pipeline completed with 4 database write errors.
