@@ -262,12 +262,16 @@ class ReconciliationEngine:
             mismatch = src_null.ne(tgt_null)
             both_present = ~(src_null | tgt_null)
 
-            src_num = pd.to_numeric(src, errors="coerce")
-            tgt_num = pd.to_numeric(tgt, errors="coerce")
-            numeric_mask = both_present & src_num.notna() & tgt_num.notna()
+            bool_tokens = ["true", "false"]
+            boolean_mask = both_present & src_norm.isin(bool_tokens) & tgt_norm.isin(bool_tokens)
+            mismatch |= boolean_mask & src_norm.ne(tgt_norm)
+
+            src_num = pd.to_numeric(src, errors="coerce").astype("float64")
+            tgt_num = pd.to_numeric(tgt, errors="coerce").astype("float64")
+            numeric_mask = both_present & ~boolean_mask & src_num.notna() & tgt_num.notna()
             mismatch |= numeric_mask & ((src_num - tgt_num).abs() > self.float_tolerance)
 
-            text_mask = both_present & ~numeric_mask
+            text_mask = both_present & ~boolean_mask & ~numeric_mask
             left_text = src_str
             right_text = tgt_str
             if self.trim_whitespace:
